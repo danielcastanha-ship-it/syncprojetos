@@ -6,9 +6,12 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '../../utils/supabaseClient';
 
 interface Client { id: string; name: string; cnpj: string; contact_name: string; contact_email: string; }
-interface PhaseGateMin { id: string; phase_number: number; file_path: string | null; status: string; }
-interface MilestoneMin { id: string; progress: number; status: string; }
-interface Milestone { id?: string; title: string; description?: string; due_date?: string; status: string; progress: number; order_index: number; }
+interface PhaseGateMin { id: string; phase_number: number; document_title?: string; description?: string; file_path: string | null; status: string; }
+interface MilestoneMin { id: string; progress: number; status: string; title: string; due_date?: string; order_index: number; }
+
+interface ArtifactUI { id?: string; document_title: string; description: string; status: string; }
+interface MilestoneUI { id?: string; title: string; description?: string; due_date?: string; status: string; progress: number; order_index: number; artifacts: ArtifactUI[]; }
+
 interface ChangeRequest { id?: string; cr_number: string; title: string; description?: string; financial_impact: number; schedule_impact?: string; status: string; }
 interface Risk { id?: string; title: string; description?: string; probability: string; impact: string; mitigation_plan?: string; status: string; order_index: number; }
 
@@ -33,8 +36,7 @@ export default function SyncHQ() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
-  // Aba ativa dentro do modal de projeto
-  const [modalTab, setModalTab] = useState<'geral' | 'marcos' | 'crs' | 'riscos'>('geral');
+  const [modalTab, setModalTab] = useState<'geral' | 'roadmap' | 'crs' | 'riscos'>('geral');
 
   const [newClient, setNewClient] = useState({ name: '', cnpj: '', contact_name: '', contact_email: '', password: '' });
   
@@ -42,7 +44,8 @@ export default function SyncHQ() {
     client_id: '', name: '', budget_baseline: '', budget_consumed: '', 
     objective: '', in_scope: '', out_scope: '' 
   });
-  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  
+  const [milestones, setMilestones] = useState<MilestoneUI[]>([]);
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
 
@@ -52,7 +55,7 @@ export default function SyncHQ() {
     if (clientsData) setClientes(clientsData);
 
     const { data: projectsData } = await supabase.from('projects')
-      .select('*, clients(name, contact_name), phase_gates(id, phase_number, file_path, status), project_milestones(id, progress, status)')
+      .select('*, clients(name, contact_name), phase_gates(id, phase_number, document_title, description, file_path, status), project_milestones(id, title, due_date, progress, status, order_index)')
       .order('name', { ascending: true });
       
     if (projectsData) setProjetos(projectsData);
@@ -67,18 +70,12 @@ export default function SyncHQ() {
   const handleSaveClient = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingClient) {
-      const { error } = await supabase.from('clients').update({ name: newClient.name, cnpj: newClient.cnpj, contact_name: newClient.contact_name, contact_email: newClient.contact_email }).eq('id', editingClient.id);
-      if (error) { alert('Erro: ' + error.message); return; }
-      
+      await supabase.from('clients').update({ name: newClient.name, cnpj: newClient.cnpj, contact_name: newClient.contact_name, contact_email: newClient.contact_email }).eq('id', editingClient.id);
       await supabase.from('profiles').update({ full_name: newClient.contact_name }).eq('client_id', editingClient.id);
-
-      if (newClient.password) { 
-        await fetch('/api/create-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newClient.contact_email, password: newClient.password, fullName: newClient.contact_name, clientId: editingClient.id }) }); 
-      }
+      if (newClient.password) { await fetch('/api/create-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newClient.contact_email, password: newClient.password, fullName: newClient.contact_name, clientId: editingClient.id }) }); }
     } else {
       if (!newClient.password) { alert('Defina uma senha provisória.'); return; }
-      const { data: clientData, error } = await supabase.from('clients').insert([{ name: newClient.name, cnpj: newClient.cnpj, contact_name: newClient.contact_name, contact_email: newClient.contact_email }]).select().single();
-      if (error) { alert('Erro: ' + error.message); return; }
+      const { data: clientData } = await supabase.from('clients').insert([{ name: newClient.name, cnpj: newClient.cnpj, contact_name: newClient.contact_name, contact_email: newClient.contact_email }]).select().single();
       if (clientData) { await fetch('/api/create-user', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: newClient.contact_email, password: newClient.password, fullName: newClient.contact_name, clientId: clientData.id }) }); }
     }
     setClientModalOpen(false); fetchData();
@@ -99,17 +96,24 @@ export default function SyncHQ() {
   const openEditProjectModal = async (project: Project) => { 
     setEditingProject(project); 
     setNewProject({ 
-      client_id: project.client_id, 
-      name: project.name, 
-      budget_baseline: project.budget_baseline.toString(), 
-      budget_consumed: (project.budget_consumed || 0).toString(),
-      objective: project.objective || '',
-      in_scope: project.in_scope || '',
-      out_scope: project.out_scope || ''
+      client_id: project.client_id, name: project.name, 
+      budget_baseline: project.budget_baseline.toString(), budget_consumed: (project.budget_consumed || 0).toString(),
+      objective: project.objective || '', in_scope: project.in_scope || '', out_scope: project.out_scope || ''
     }); 
 
     const { data: msData } = await supabase.from('project_milestones').select('*').eq('project_id', project.id).order('order_index');
-    setMilestones(msData || []);
+    const { data: gatesData } = await supabase.from('phase_gates').select('*').eq('project_id', project.id);
+    
+    const mergedMilestones: MilestoneUI[] = (msData || []).map((m, idx) => {
+      const phaseGates = (gatesData || []).filter(g => g.phase_number === idx + 1);
+      return {
+        ...m,
+        artifacts: phaseGates.map(g => ({
+          id: g.id, document_title: g.document_title || '', description: g.description || '', status: g.status
+        }))
+      };
+    });
+    setMilestones(mergedMilestones);
 
     const { data: crData } = await supabase.from('change_requests').select('*').eq('project_id', project.id).order('created_at', { ascending: true });
     setChangeRequests(crData || []);
@@ -121,8 +125,51 @@ export default function SyncHQ() {
     setProjectModalOpen(true); 
   };
 
+  const handleGenerateGeminiPrompt = (proj: Project) => {
+    let phasesText = "";
+    (proj.project_milestones || []).sort((a, b) => a.order_index - b.order_index).forEach((m, idx) => {
+      const phaseNum = idx + 1;
+      phasesText += `\n- **Fase ${phaseNum}: ${m.title}** (Previsão: ${m.due_date || 'N/A'} | Avanço Atual: ${m.progress}%)\n`;
+      const gates = (proj.phase_gates || []).filter(g => g.phase_number === phaseNum);
+      if (gates.length > 0) {
+          gates.forEach(gate => {
+            phasesText += `  * Artefato de Governança (Tollgate): ${gate.document_title || 'Não nomeado'}\n`;
+            phasesText += `    Objetivo/Descrição: ${gate.description || 'Não especificado'}\n`;
+          });
+      } else {
+          phasesText += `  * (Nenhum artefato restritivo configurado para esta fase)\n`;
+      }
+    });
+
+    if (!phasesText) phasesText = "Nenhuma fase ou artefato cadastrado no sistema.";
+
+    const promptText = `Atue como um Arquiteto Sênior de PMO e Diretor Executivo da Sync Projetos. Com base nos dados oficiais abaixo, crie um relatório profissional e detalhado explicando e detalhando o Framework de Governança estabelecido para este projeto corporativo:
+
+- **Nome do Projeto:** ${proj.name}
+- **Empresa Cliente:** ${proj.clients?.name || 'Não informado'}
+- **Sponsor / Diretor Responsável:** ${proj.clients?.contact_name || 'Não informado'}
+- **Fase Executiva Atual:** ${proj.status}
+- **Baseline Financeira (Orçamento Total):** R$ ${proj.budget_baseline?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+- **Valor Financeiro Consumido:** R$ ${proj.budget_consumed?.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+- **Objetivo Executivo:** ${proj.objective || 'Não especificado'}
+- **Dentro do Escopo (In-Scope):** ${proj.in_scope || 'Não especificado'}
+- **Fora do Escopo (Out-of-Scope):** ${proj.out_scope || 'Não especificado'}
+
+**Roadmap de Entregas e Portões de Governança (Tollgates):**
+${phasesText}
+
+Por favor, estruture a resposta cobrindo:
+1. **Resumo Executivo e Alinhamento Estratégico:** Apresentação do projeto e da parceria com a Sync Projetos.
+2. **Framework de Governança Orientado a Marcos (Milestone-Driven):** Apresente e explique detalhadamente as fases/marcos criadas para o projeto (fornecidas acima), bem como os artefatos exigidos para cada uma. Explique o propósito de cada documento e como a amarração do cronograma com a aprovação documental garante o faturamento seguro.
+3. **Controle de Escopo, Baseline e Change Requests:** Como o controle rigoroso de aditivos protege o orçamento contra scope creep.
+4. **Alçadas de Aprovação, Compliance e Trilha de Auditoria:** Como a segurança jurídica e a separação de papéis garantem a conformidade do projeto.
+`;
+    navigator.clipboard.writeText(promptText);
+    alert(`🤖 Prompt para o Gemini gerado e copiado com sucesso para a área de transferência!\n\nCole o prompt em uma nova conversa com o Gemini para gerar o relatório profissional do projeto "${proj.name}".`);
+  };
+
   const handleAddMilestone = () => {
-    setMilestones([...milestones, { title: '', description: '', due_date: '', status: 'Pendente', progress: 0, order_index: milestones.length }]);
+    setMilestones([...milestones, { title: '', description: '', due_date: '', status: 'Pendente', progress: 0, order_index: milestones.length, artifacts: [] }]);
   };
   const handleUpdateMilestone = (index: number, field: string, value: any) => {
     const updated = [...milestones];
@@ -132,25 +179,28 @@ export default function SyncHQ() {
   };
   const handleRemoveMilestone = (index: number) => setMilestones(milestones.filter((_, i) => i !== index));
 
-  const handleAddCR = () => {
-    const nextNum = `CR-${String(changeRequests.length + 1).padStart(2, '0')}`;
-    setChangeRequests([...changeRequests, { cr_number: nextNum, title: '', description: '', financial_impact: 0, schedule_impact: '', status: 'Pendente' }]);
+  const handleAddArtifact = (milestoneIndex: number) => {
+    const updated = [...milestones];
+    updated[milestoneIndex].artifacts.push({ document_title: '', description: '', status: 'Pendente' });
+    setMilestones(updated);
   };
-  const handleUpdateCR = (index: number, field: string, value: any) => {
-    const updated = [...changeRequests];
-    updated[index] = { ...updated[index], [field]: value };
-    setChangeRequests(updated);
+  const handleUpdateArtifact = (mIndex: number, aIndex: number, field: string, value: string) => {
+    const updated = [...milestones];
+    updated[mIndex].artifacts[aIndex] = { ...updated[mIndex].artifacts[aIndex], [field]: value };
+    setMilestones(updated);
   };
+  const handleRemoveArtifact = (mIndex: number, aIndex: number) => {
+    const updated = [...milestones];
+    updated[mIndex].artifacts.splice(aIndex, 1);
+    setMilestones(updated);
+  };
+
+  const handleAddCR = () => { setChangeRequests([...changeRequests, { cr_number: `CR-${String(changeRequests.length + 1).padStart(2, '0')}`, title: '', description: '', financial_impact: 0, schedule_impact: '', status: 'Pendente' }]); };
+  const handleUpdateCR = (index: number, field: string, value: any) => { const updated = [...changeRequests]; updated[index] = { ...updated[index], [field]: value }; setChangeRequests(updated); };
   const handleRemoveCR = (index: number) => setChangeRequests(changeRequests.filter((_, i) => i !== index));
 
-  const handleAddRisk = () => {
-    setRisks([...risks, { title: '', description: '', probability: 'Média', impact: 'Médio', mitigation_plan: '', status: 'Aberto', order_index: risks.length }]);
-  };
-  const handleUpdateRisk = (index: number, field: string, value: any) => {
-    const updated = [...risks];
-    updated[index] = { ...updated[index], [field]: value };
-    setRisks(updated);
-  };
+  const handleAddRisk = () => { setRisks([...risks, { title: '', description: '', probability: 'Média', impact: 'Médio', mitigation_plan: '', status: 'Aberto', order_index: risks.length }]); };
+  const handleUpdateRisk = (index: number, field: string, value: any) => { const updated = [...risks]; updated[index] = { ...updated[index], [field]: value }; setRisks(updated); };
   const handleRemoveRisk = (index: number) => setRisks(risks.filter((_, i) => i !== index));
 
   const handleSaveProject = async (e: React.FormEvent) => {
@@ -158,13 +208,9 @@ export default function SyncHQ() {
     const baselineNum = parseFloat(newProject.budget_baseline);
     
     const projectData: any = { 
-      client_id: newProject.client_id, 
-      name: newProject.name, 
-      budget_baseline: baselineNum,
-      budget_consumed: parseFloat(newProject.budget_consumed || '0'),
-      objective: newProject.objective,
-      in_scope: newProject.in_scope,
-      out_scope: newProject.out_scope
+      client_id: newProject.client_id, name: newProject.name, 
+      budget_baseline: baselineNum, budget_consumed: parseFloat(newProject.budget_consumed || '0'),
+      objective: newProject.objective, in_scope: newProject.in_scope, out_scope: newProject.out_scope
     };
     
     let targetProjectId = editingProject?.id;
@@ -189,12 +235,32 @@ export default function SyncHQ() {
         await supabase.from('project_milestones').insert(msToInsert);
       }
 
+      const gatesToUpsert: any[] = [];
+      const gateIdsToKeep: string[] = [];
+      
+      milestones.forEach((m, idx) => {
+        m.artifacts.forEach(a => {
+          const gate: any = { project_id: targetProjectId, phase_number: idx + 1, document_title: a.document_title, description: a.description, status: a.status || 'Pendente' };
+          if (a.id) { gate.id = a.id; gateIdsToKeep.push(a.id); }
+          gatesToUpsert.push(gate);
+        });
+      });
+
+      if (editingProject) {
+        if (gateIdsToKeep.length > 0) {
+          const { data: allGates } = await supabase.from('phase_gates').select('id').eq('project_id', targetProjectId);
+          const idsToDelete = (allGates || []).map(g => g.id).filter(id => !gateIdsToKeep.includes(id));
+          if (idsToDelete.length > 0) await supabase.from('phase_gates').delete().in('id', idsToDelete);
+        } else {
+          await supabase.from('phase_gates').delete().eq('project_id', targetProjectId);
+        }
+      }
+      if (gatesToUpsert.length > 0) await supabase.from('phase_gates').upsert(gatesToUpsert);
+
       await supabase.from('change_requests').delete().eq('project_id', targetProjectId);
       if (changeRequests.length > 0) {
         const crToInsert = changeRequests.map(cr => ({
-          project_id: targetProjectId, cr_number: cr.cr_number, title: cr.title,
-          description: cr.description, financial_impact: parseFloat(cr.financial_impact as any) || 0,
-          schedule_impact: cr.schedule_impact, status: cr.status
+          project_id: targetProjectId, cr_number: cr.cr_number, title: cr.title, description: cr.description, financial_impact: parseFloat(cr.financial_impact as any) || 0, schedule_impact: cr.schedule_impact, status: cr.status
         }));
         await supabase.from('change_requests').insert(crToInsert);
       }
@@ -202,9 +268,7 @@ export default function SyncHQ() {
       await supabase.from('project_risks').delete().eq('project_id', targetProjectId);
       if (risks.length > 0) {
         const riskToInsert = risks.map((r, idx) => ({
-          project_id: targetProjectId, title: r.title, description: r.description,
-          probability: r.probability, impact: r.impact, mitigation_plan: r.mitigation_plan,
-          status: r.status, order_index: idx
+          project_id: targetProjectId, title: r.title, description: r.description, probability: r.probability, impact: r.impact, mitigation_plan: r.mitigation_plan, status: r.status, order_index: idx
         }));
         await supabase.from('project_risks').insert(riskToInsert);
       }
@@ -256,16 +320,13 @@ export default function SyncHQ() {
                   {projetos.map(proj => {
                     const faseAtualNum = parseInt(proj.status.replace(/\D/g, '')) || 1;
                     const artifactsFaseAtual = proj.phase_gates?.filter(g => g.phase_number === faseAtualNum) || [];
-                    
                     const totalArtifacts = artifactsFaseAtual.length;
                     const totalPdfs = artifactsFaseAtual.filter(g => g.file_path).length;
                     const readyForApproval = totalArtifacts > 0 && totalArtifacts === totalPdfs;
                     const rejectedCount = artifactsFaseAtual.filter(g => g.status === 'Rejeitado').length;
 
                     const projMilestones = proj.project_milestones || [];
-                    const progressoFisicoPMO = projMilestones.length > 0
-                      ? Math.round(projMilestones.reduce((acc, m) => acc + (m.progress || 0), 0) / projMilestones.length)
-                      : 0;
+                    const progressoFisicoPMO = projMilestones.length > 0 ? Math.round(projMilestones.reduce((acc, m) => acc + (m.progress || 0), 0) / projMilestones.length) : 0;
 
                     return (
                     <div key={proj.id} className={`bg-[#1e293b] border ${rejectedCount > 0 ? 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.2)]' : 'border-slate-700 shadow-lg'} rounded-xl p-6 relative group flex flex-col`}>
@@ -322,8 +383,15 @@ export default function SyncHQ() {
                       </div>
 
                       <button 
+                        onClick={() => handleGenerateGeminiPrompt(proj)} 
+                        className="w-full mb-2 bg-[#fbbf24]/10 hover:bg-[#fbbf24]/20 text-[#fbbf24] border border-[#fbbf24]/40 font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow"
+                      >
+                        🤖 Gerar Prompt para o Gemini (Relatório)
+                      </button>
+
+                      <button 
                         onClick={() => router.push('/sync-hq/relatorio?projectId=' + proj.id)} 
-                        className="w-full mb-3 bg-slate-800 hover:bg-slate-700 text-[#fbbf24] border border-[#fbbf24]/30 font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow"
+                        className="w-full mb-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 font-bold py-2.5 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow"
                       >
                         📄 Gerar Status Report Executivo
                       </button>
@@ -345,7 +413,7 @@ export default function SyncHQ() {
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"><form onSubmit={handleSaveClient} className="bg-[#1e293b] border border-slate-700 p-8 rounded-2xl max-w-md w-full shadow-2xl"><h3 className="text-xl font-bold text-white mb-6 border-b border-slate-700 pb-3">{editingClient ? 'Editar Cliente' : 'Novo Cliente'}</h3><div className="space-y-4 mb-8"><div><label className="block text-xs font-bold text-slate-400 mb-1">Nome da Empresa</label><input required type="text" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-sm" /></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-slate-400 mb-1">Contato Diretor</label><input required type="text" value={newClient.contact_name} onChange={e => setNewClient({...newClient, contact_name: e.target.value})} className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-sm" /></div><div><label className="block text-xs font-bold text-slate-400 mb-1">E-mail</label><input required type="email" value={newClient.contact_email} onChange={e => setNewClient({...newClient, contact_email: e.target.value})} className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-sm" /></div></div><div className="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg"><label className="block text-[11px] uppercase tracking-wider text-blue-300 font-bold mb-1">{editingClient ? 'Redefinir Senha (Opcional)' : 'Senha Provisória'}</label><input required={!editingClient} type="text" value={newClient.password} onChange={e => setNewClient({...newClient, password: e.target.value})} className="w-full bg-[#0f172a] border border-blue-500/50 rounded p-2 text-white text-sm" /></div></div><div className="flex gap-3"><button type="button" onClick={() => setClientModalOpen(false)} className="flex-1 py-2.5 bg-transparent border border-slate-600 text-slate-300 rounded font-bold hover:bg-slate-700 transition">Cancelar</button><button type="submit" className="flex-1 py-2.5 bg-[#fbbf24] text-[#0f172a] rounded font-extrabold hover:bg-[#f59e0b] transition">Salvar</button></div></form></div>
       )}
 
-      {/* MODAL DE PROJETO COM ABAS ORGANIZADAS */}
+      {/* MODAL DE PROJETO */}
       {isProjectModalOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
           <form onSubmit={handleSaveProject} className="bg-[#1e293b] border border-slate-700 p-8 rounded-2xl max-w-4xl w-full shadow-2xl max-h-[90vh] flex flex-col">
@@ -355,13 +423,12 @@ export default function SyncHQ() {
               <button type="button" onClick={() => setProjectModalOpen(false)} className="text-slate-400 hover:text-white font-bold">✕</button>
             </div>
 
-            {/* SISTEMA DE ABAS DO MODAL */}
             <div className="flex gap-2 border-b border-slate-700 pb-3 mb-6 overflow-x-auto">
               <button type="button" onClick={() => setModalTab('geral')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition ${modalTab === 'geral' ? 'bg-[#fbbf24] text-[#0f172a]' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
                 1. Geral & Escopo
               </button>
-              <button type="button" onClick={() => setModalTab('marcos')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition flex items-center gap-2 ${modalTab === 'marcos' ? 'bg-[#fbbf24] text-[#0f172a]' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
-                2. Cronograma (Marcos) <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[10px]">{milestones.length}</span>
+              <button type="button" onClick={() => setModalTab('roadmap')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition flex items-center gap-2 ${modalTab === 'roadmap' ? 'bg-[#fbbf24] text-[#0f172a]' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+                2. Roadmap & Portões <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[10px]">{milestones.length}</span>
               </button>
               <button type="button" onClick={() => setModalTab('crs')} className={`px-4 py-2 rounded-lg text-xs font-bold uppercase transition flex items-center gap-2 ${modalTab === 'crs' ? 'bg-[#fbbf24] text-[#0f172a]' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
                 3. Aditivos (CRs) <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded text-[10px]">{changeRequests.length}</span>
@@ -371,10 +438,8 @@ export default function SyncHQ() {
               </button>
             </div>
 
-            {/* CONTEÚDO DAS ABAS (ROLÁVEL) */}
             <div className="flex-1 overflow-y-auto pr-2 space-y-6">
               
-              {/* ABA 1: GERAL & ESCOPO */}
               {modalTab === 'geral' && (
                 <div className="space-y-5 animate-fadeIn">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -421,55 +486,63 @@ export default function SyncHQ() {
                 </div>
               )}
 
-              {/* ABA 2: CRONOGRAMA (MARCOS) */}
-              {modalTab === 'marcos' && (
-                <div className="space-y-4 animate-fadeIn">
+              {modalTab === 'roadmap' && (
+                <div className="space-y-6 animate-fadeIn">
                   <div className="flex justify-between items-center">
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#fbbf24]">Cronograma Macro de Marcos (Milestones & % de Avanço)</h4>
-                      <p className="text-[11px] text-slate-400">Gerencie as entregas principais e o progresso físico consolidado.</p>
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[#fbbf24]">Roadmap Orientado a Marcos (Milestones & Tollgates)</h4>
+                      <p className="text-[11px] text-slate-400">Defina as Fases/Marcos e anexe os artefatos de governança exigidos para liberar cada uma.</p>
                     </div>
-                    <button type="button" onClick={handleAddMilestone} className="text-xs bg-[#fbbf24]/20 text-[#fbbf24] hover:bg-[#fbbf24]/30 font-bold px-3 py-1.5 rounded transition border border-[#fbbf24]/40">+ Adicionar Marco</button>
+                    <button type="button" onClick={handleAddMilestone} className="text-xs bg-[#fbbf24]/20 text-[#fbbf24] hover:bg-[#fbbf24]/30 font-bold px-3 py-1.5 rounded transition border border-[#fbbf24]/40">+ Adicionar Fase/Marco</button>
                   </div>
 
                   {milestones.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic bg-slate-900/50 p-8 rounded-lg border border-slate-800 text-center">Nenhum marco cadastrado no cronograma macro.</p>
+                    <p className="text-xs text-slate-500 italic bg-slate-900/50 p-8 rounded-lg border border-slate-800 text-center">O Roadmap executivo ainda não foi planejado.</p>
                   ) : (
-                    <div className="space-y-3">
-                      {milestones.map((m, index) => (
-                        <div key={index} className="bg-slate-900/80 p-4 rounded-xl border border-slate-700 space-y-3 relative">
-                          <button type="button" onClick={() => handleRemoveMilestone(index)} className="absolute top-3 right-3 text-red-400 hover:text-red-300 text-xs font-bold">✕</button>
+                    <div className="space-y-6">
+                      {milestones.map((m, mIndex) => (
+                        <div key={mIndex} className="bg-slate-900/80 p-5 rounded-xl border-2 border-slate-700 relative">
+                          <button type="button" onClick={() => handleRemoveMilestone(mIndex)} className="absolute top-4 right-4 text-red-400 hover:text-red-300 text-xs font-bold bg-red-950/30 px-2 py-1 rounded">✕ Remover Fase</button>
                           
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 pr-10">
+                          <div className="flex items-center gap-3 mb-4">
+                            <span className="w-8 h-8 rounded-full bg-[#1e293b] border-2 border-[#fbbf24] text-[#fbbf24] font-black flex items-center justify-center text-sm shrink-0">{mIndex + 1}</span>
+                            <h5 className="font-extrabold text-white uppercase tracking-wider">Configuração da Fase {mIndex + 1}</h5>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pr-16 mb-5">
                             <div className="md:col-span-2">
-                              <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Título do Marco</label>
-                              <input type="text" required value={m.title} onChange={e => handleUpdateMilestone(index, 'title', e.target.value)} placeholder="Ex: Go-Live Fase 1" className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-xs" />
+                              <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Título da Fase / Marco</label>
+                              <input type="text" required value={m.title} onChange={e => handleUpdateMilestone(mIndex, 'title', e.target.value)} placeholder="Ex: Iniciação e Planejamento" className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-xs" />
                             </div>
                             <div>
-                              <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Previsão (Data)</label>
-                              <input type="text" value={m.due_date || ''} onChange={e => handleUpdateMilestone(index, 'due_date', e.target.value)} placeholder="Ex: 30/04/2026" className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-xs" />
+                              <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Previsão</label>
+                              <input type="text" value={m.due_date || ''} onChange={e => handleUpdateMilestone(mIndex, 'due_date', e.target.value)} placeholder="Ex: 30/08/2026" className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-xs" />
                             </div>
                             <div>
-                              <label className="block text-[10px] text-[#fbbf24] uppercase font-bold mb-1">% de Avanço (0-100)</label>
-                              <input type="number" min="0" max="100" value={m.progress ?? 0} onChange={e => handleUpdateMilestone(index, 'progress', e.target.value)} className="w-full bg-[#0f172a] border border-[#fbbf24]/50 rounded p-2 text-white text-xs font-mono font-bold text-center" />
+                              <label className="block text-[10px] text-[#fbbf24] uppercase font-bold mb-1">% Avanço Físico</label>
+                              <input type="number" min="0" max="100" value={m.progress ?? 0} onChange={e => handleUpdateMilestone(mIndex, 'progress', e.target.value)} className="w-full bg-[#0f172a] border border-[#fbbf24]/50 rounded p-2 text-white text-xs font-mono font-bold text-center" />
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                              <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Descrição / Entregável</label>
-                              <input type="text" value={m.description || ''} onChange={e => handleUpdateMilestone(index, 'description', e.target.value)} placeholder="Ex: Homologação com usuários-chave" className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-xs" />
+                          <div className="bg-[#1e293b] p-4 rounded-lg border border-slate-700">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">Artefatos Obrigatórios (Portões desta Fase)</span>
+                              <button type="button" onClick={() => handleAddArtifact(mIndex)} className="text-[10px] bg-emerald-900/30 text-emerald-400 hover:bg-emerald-900/50 font-bold px-2 py-1 rounded border border-emerald-500/30">+ Adicionar Artefato</button>
                             </div>
-                            <div>
-                              <label className="block text-[10px] text-slate-400 uppercase font-bold mb-1">Status do Marco</label>
-                              <select value={m.status} onChange={e => handleUpdateMilestone(index, 'status', e.target.value)} className="w-full bg-[#0f172a] border border-slate-600 rounded p-2 text-white text-xs font-bold">
-                                <option value="Pendente">Pendente</option>
-                                <option value="Em andamento">Em andamento</option>
-                                <option value="Concluído">Concluído (100%)</option>
-                                <option value="Atrasado">Atrasado</option>
-                                <option value="Cancelado">Cancelado</option>
-                              </select>
-                            </div>
+                            
+                            {m.artifacts.length === 0 ? (
+                              <p className="text-[11px] text-slate-500 italic">Nenhum artefato configurado. Esta fase não terá bloqueio documental de faturamento.</p>
+                            ) : (
+                              <div className="space-y-2">
+                                {m.artifacts.map((art, aIndex) => (
+                                  <div key={aIndex} className="flex items-center gap-3 bg-[#0f172a] p-2 rounded border border-slate-600">
+                                    <input type="text" required value={art.document_title} onChange={e => handleUpdateArtifact(mIndex, aIndex, 'document_title', e.target.value)} placeholder="Nome do Documento (Ex: Termo de Abertura)" className="flex-1 bg-transparent border-none text-white text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 rounded px-2" />
+                                    <input type="text" value={art.description} onChange={e => handleUpdateArtifact(mIndex, aIndex, 'description', e.target.value)} placeholder="Breve objetivo..." className="flex-1 bg-transparent border-none text-slate-400 text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 rounded px-2" />
+                                    <button type="button" onClick={() => handleRemoveArtifact(mIndex, aIndex)} className="text-red-500 hover:text-red-400 font-bold px-2">✕</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -478,7 +551,6 @@ export default function SyncHQ() {
                 </div>
               )}
 
-              {/* ABA 3: ADITIVOS (CRs) */}
               {modalTab === 'crs' && (
                 <div className="space-y-4 animate-fadeIn">
                   <div className="flex justify-between items-center">
@@ -526,7 +598,6 @@ export default function SyncHQ() {
                 </div>
               )}
 
-              {/* ABA 4: MATRIZ DE RISCOS */}
               {modalTab === 'riscos' && (
                 <div className="space-y-4 animate-fadeIn">
                   <div className="flex justify-between items-center">
@@ -593,7 +664,6 @@ export default function SyncHQ() {
 
             </div>
             
-            {/* RODAPÉ DO MODAL (FIXO) */}
             <div className="flex gap-3 pt-4 mt-4 border-t border-slate-700">
               <button type="button" onClick={() => setProjectModalOpen(false)} className="flex-1 py-2.5 bg-transparent border border-slate-600 text-slate-300 rounded font-bold hover:bg-slate-700 transition">Cancelar</button>
               <button type="submit" className="flex-1 py-2.5 bg-[#fbbf24] text-[#0f172a] rounded font-extrabold hover:bg-[#f59e0b] transition">Salvar Projeto & Governança</button>

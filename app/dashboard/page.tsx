@@ -10,7 +10,7 @@ interface ProjectData {
   objective?: string; in_scope?: string; out_scope?: string; original_baseline?: number;
 }
 interface PhaseGate { id: string; phase_number: number; document_title: string; description: string; status: string; }
-interface Milestone { id: string; title: string; description?: string; due_date?: string; status: string; progress: number; }
+interface Milestone { id: string; title: string; description?: string; due_date?: string; status: string; progress: number; order_index: number; }
 interface Risk { id: string; title: string; description?: string; probability: string; impact: string; mitigation_plan?: string; status: string; }
 
 export default function DashboardSponsor() {
@@ -170,10 +170,7 @@ export default function DashboardSponsor() {
     : 0;
 
   const faseAtual = parseInt(projetoAtual.status.replace(/\D/g, '')) || 1;
-  const maxPhase = gates.length > 0 ? Math.max(...gates.map(g => g.phase_number)) : 1;
-  const arrayFases = Array.from({ length: maxPhase }, (_, i) => i + 1);
   const artefatosFaseAtual = gates.filter(g => g.phase_number === faseAtual);
-  
   const artefatosPendentes = artefatosFaseAtual.filter(g => g.status === 'Pendente' || g.status === 'Rejeitado');
   const temRejeicao = gates.some(g => g.status === 'Rejeitado');
   const riscosAbertos = risks.filter(r => r.status === 'Aberto').length;
@@ -274,12 +271,113 @@ export default function DashboardSponsor() {
             </div>
           </section>
 
+          {/* ROADMAP EXECUTIVO & PORTÕES DE GOVERNANÇA (UNIFICADO) */}
+          <section className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-4">
+            <div className="border-b border-slate-700 pb-3 mb-6">
+              <h2 className="text-lg font-semibold text-slate-300 flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#fbbf24]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Roadmap Executivo & Portões de Governança
+              </h2>
+              <p className="text-[11px] text-slate-400 mt-1">Linha do tempo consolidada de fases, marcos físicos e artefatos de bloqueio.</p>
+            </div>
+
+            {milestones.length === 0 ? (
+              <p className="text-xs text-slate-500 italic py-4 text-center">Nenhum roadmap planejado pelo PMO.</p>
+            ) : (
+              <div className="relative pl-6 space-y-8 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-700">
+                {milestones.map((m, index) => {
+                  const phaseNum = index + 1;
+                  const isConcluido = m.status === 'Concluído';
+                  const isAndamento = m.status === 'Em andamento';
+                  const isAtrasado = m.status === 'Atrasado';
+
+                  const badgeColor = isConcluido ? 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30' :
+                                     isAndamento ? 'bg-amber-900/40 text-amber-400 border-amber-500/30' :
+                                     isAtrasado ? 'bg-red-900/40 text-red-400 border-red-500/30' :
+                                     'bg-slate-800 text-slate-400 border-slate-700';
+
+                  const faseArtefatos = gates.filter(g => g.phase_number === phaseNum);
+
+                  return (
+                    <div key={m.id} className="relative bg-slate-900/60 p-5 rounded-xl border border-slate-700">
+                      {/* Ponto na linha do tempo */}
+                      <div className={`absolute -left-[33px] top-6 w-4 h-4 rounded-full border-4 border-[#0f172a] ${isConcluido ? 'bg-emerald-500' : isAndamento ? 'bg-amber-500 animate-pulse' : isAtrasado ? 'bg-red-500' : 'bg-slate-600'}`}></div>
+
+                      {/* Cabeçalho da Fase/Marco */}
+                      <div className="flex justify-between items-start gap-4 mb-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] uppercase font-bold tracking-wider text-[#fbbf24]">Fase {phaseNum}</span>
+                            <span className={`text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded border ${badgeColor}`}>
+                              {m.status}
+                            </span>
+                          </div>
+                          <h3 className="font-extrabold text-white text-lg">{m.title}</h3>
+                          {m.due_date && <span className="text-xs text-slate-400 font-mono mt-1 block">Data Alvo: {m.due_date}</span>}
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/40 px-3 py-1.5 rounded-lg border border-emerald-500/30 block mb-2">
+                            {m.progress ?? 0}% Concluído
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Barra de Progresso do Marco */}
+                      <div className="w-full bg-slate-800 rounded-full h-1.5 mb-5 overflow-hidden">
+                        <div className="bg-[#fbbf24] h-1.5 rounded-full transition-all" style={{ width: `${Math.min(m.progress || 0, 100)}%` }}></div>
+                      </div>
+
+                      {/* Portões de Governança (Artefatos da Fase) */}
+                      <div className="bg-[#1e293b] rounded-lg border border-slate-700 p-4">
+                        <h4 className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-3">Portões de Governança (Tollgates)</h4>
+                        
+                        {faseArtefatos.length === 0 ? (
+                           <p className="text-xs text-slate-500 italic">Sem artefatos de bloqueio cadastrados.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {faseArtefatos.map(gate => {
+                              const isAprovado = gate.status === 'Aprovado';
+                              const isRejeitado = gate.status === 'Rejeitado';
+                              
+                              return (
+                                <div key={gate.id} onClick={() => { if (isAprovado) setModalGate(gate); }} className={`p-3 rounded-lg border transition-all flex justify-between items-center ${
+                                  isRejeitado ? 'bg-red-950/20 border-red-500/50' : 
+                                  isAprovado ? 'bg-emerald-900/10 border-emerald-500/30 hover:border-emerald-500/60 cursor-pointer group' : 
+                                  'bg-slate-900/50 border-slate-700'
+                                }`}>
+                                  <div>
+                                    <h5 className={`font-bold text-xs ${isAprovado ? 'text-emerald-100 group-hover:text-emerald-400' : isRejeitado ? 'text-red-300' : 'text-slate-200'}`}>{gate.document_title}</h5>
+                                    <p className="text-[10px] text-slate-500 mt-0.5">{gate.description}</p>
+                                  </div>
+                                  
+                                  <div className="flex flex-col items-end shrink-0 ml-3">
+                                    {isRejeitado ? (
+                                      <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded bg-red-900/40 text-red-400 border border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]">Rejeitado</span>
+                                    ) : isAprovado ? (
+                                      <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded bg-emerald-900/40 text-emerald-400 border border-emerald-500/50">✓ Aprovado</span>
+                                    ) : (
+                                      <span className="px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded bg-slate-800 text-slate-400 border border-slate-600">Pendente</span>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
           {/* MATRIZ DE RISCOS E IMPEDIMENTOS */}
           <section className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-4">
             <div className="flex justify-between items-center border-b border-slate-700 pb-3">
               <h2 className="text-lg font-semibold text-slate-300 flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#fbbf24]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                Matriz de Riscos e Impedimentos (Issue & Risk Log)
+                Matriz de Riscos e Impedimentos
               </h2>
               <span className="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-lg border border-slate-600 font-bold">
                 Riscos Abertos: <span className="text-amber-400">{riscosAbertos}</span>
@@ -324,133 +422,6 @@ export default function DashboardSponsor() {
               </div>
             )}
           </section>
-
-          {/* CRONOGRAMA MACRO DE MARCOS */}
-          <section className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700 shadow-xl space-y-4">
-            <h2 className="text-lg font-semibold text-slate-300 flex items-center gap-2">
-              <svg className="w-5 h-5 text-[#fbbf24]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-              Cronograma Macro de Entregas (Milestones)
-            </h2>
-
-            {milestones.length === 0 ? (
-              <p className="text-xs text-slate-500 italic py-4 text-center">Nenhum marco cadastrado.</p>
-            ) : (
-              <div className="relative pl-6 space-y-6 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-700">
-                {milestones.map((m) => {
-                  const isConcluido = m.status === 'Concluído';
-                  const isAndamento = m.status === 'Em andamento';
-                  const isAtrasado = m.status === 'Atrasado';
-
-                  const badgeColor = isConcluido ? 'bg-emerald-900/40 text-emerald-400 border-emerald-500/30' :
-                                     isAndamento ? 'bg-amber-900/40 text-amber-400 border-amber-500/30' :
-                                     isAtrasado ? 'bg-red-900/40 text-red-400 border-red-500/30' :
-                                     'bg-slate-800 text-slate-400 border-slate-700';
-
-                  return (
-                    <div key={m.id} className="relative bg-slate-900/60 p-4 rounded-xl border border-slate-700">
-                      <div className={`absolute -left-[29px] top-5 w-3.5 h-3.5 rounded-full border-2 border-[#0f172a] ${isConcluido ? 'bg-emerald-500' : isAndamento ? 'bg-amber-500 animate-pulse' : isAtrasado ? 'bg-red-500' : 'bg-slate-600'}`}></div>
-
-                      <div className="flex justify-between items-start gap-4 mb-2">
-                        <div>
-                          <h3 className="font-bold text-white text-sm">{m.title}</h3>
-                          {m.due_date && <span className="text-xs text-[#fbbf24] font-mono mt-0.5 block">Previsão: {m.due_date}</span>}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/40 px-2.5 py-1 rounded border border-emerald-500/30">
-                            {m.progress ?? 0}% Concluído
-                          </span>
-                          <span className={`text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded border ${badgeColor}`}>
-                            {m.status}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full bg-slate-800 rounded-full h-1.5 mt-3 overflow-hidden">
-                        <div className="bg-[#fbbf24] h-1.5 rounded-full transition-all" style={{ width: `${Math.min(m.progress || 0, 100)}%` }}></div>
-                      </div>
-
-                      {m.description && <p className="text-xs text-slate-400 mt-3">{m.description}</p>}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700 shadow-xl">
-            <h2 className="text-lg font-semibold text-slate-300 mb-6">Roadmap de Implementação (Fases)</h2>
-            {arrayFases.length > 0 ? (
-              <div className="flex justify-between items-center relative px-2 overflow-x-auto custom-scrollbar pb-4">
-                <div className="absolute top-1/2 left-0 w-full h-1 bg-slate-700 -z-10 -translate-y-1/2"></div>
-                {arrayFases.map((fase) => (
-                  <div key={fase} className="flex flex-col items-center gap-2 bg-[#1e293b] px-4 min-w-[80px]">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold border-4 shrink-0 ${fase < faseAtual ? 'bg-[#fbbf24] border-[#fbbf24] text-[#0f172a]' : fase === faseAtual ? 'bg-[#0f172a] border-[#fbbf24] text-[#fbbf24] animate-pulse' : 'bg-slate-800 border-slate-600 text-slate-500'}`}>{fase}</div>
-                    <span className={`text-[10px] uppercase font-bold tracking-wider ${fase <= faseAtual ? 'text-white' : 'text-slate-500'}`}>Fase {fase}</span>
-                  </div>
-                ))}
-              </div>
-            ) : ( <p className="text-slate-500 text-sm italic text-center py-4">Governança ainda não configurada no HQ.</p> )}
-            
-            <div className="mt-6 text-center text-sm text-[#fbbf24] font-bold uppercase tracking-widest">
-              Fase Atual do Projeto: {projetoAtual.status}
-            </div>
-          </section>
-
-          <section className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700 shadow-xl">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-semibold text-slate-300">Inventário de Artefatos (Tollgates)</h2>
-            </div>
-            <div className="space-y-8">
-              {arrayFases.map(faseNum => {
-                const artefatos = gates.filter(g => g.phase_number === faseNum);
-                const isAtiva = faseNum === faseAtual;
-                if (artefatos.length === 0 && !isAtiva) return null;
-
-                return (
-                  <div key={faseNum} className={`border-l-2 pl-4 ${isAtiva ? 'border-[#fbbf24]' : 'border-slate-700'}`}>
-                    <h3 className={`text-sm font-bold uppercase mb-3 ${isAtiva ? 'text-[#fbbf24]' : 'text-slate-500'}`}>Fase {faseNum}</h3>
-                    <div className="space-y-3">
-                      {artefatos.length === 0 && <p className="text-xs text-slate-500 italic">Nenhum artefato mapeado.</p>}
-                      {artefatos.map(gate => {
-                        const isAprovado = gate.status === 'Aprovado';
-                        const isRejeitado = gate.status === 'Rejeitado';
-                        
-                        return (
-                          <div key={gate.id} onClick={() => { if (isAprovado) setModalGate(gate); }} className={`p-4 rounded-xl border transition-all flex justify-between items-center ${
-                            isRejeitado ? 'bg-red-950/20 border-red-500/50' : 
-                            isAprovado ? 'bg-emerald-900/10 border-emerald-500/30 hover:border-emerald-500/60 cursor-pointer group' : 
-                            isAtiva ? 'bg-amber-950/20 border-amber-500/50' : 
-                            'bg-slate-900/30 border-slate-800/60 opacity-60'
-                          }`}>
-                            <div>
-                              <h4 className={`font-bold text-sm ${isAprovado ? 'text-emerald-100 group-hover:text-emerald-400' : isRejeitado ? 'text-red-300' : 'text-white'}`}>{gate.document_title}</h4>
-                              <p className="text-xs text-slate-400 mt-1">{gate.description}</p>
-                            </div>
-                            
-                            <div className="flex flex-col items-end gap-2 ml-4">
-                              {isRejeitado ? (
-                                <span className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded border bg-red-900/40 text-red-400 border-red-500/50 shadow-[0_0_10px_rgba(239,68,68,0.2)]">
-                                  Rejeitado
-                               </span>
-                              ) : isAprovado ? (
-                                <span className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded border bg-emerald-900/40 text-emerald-400 border-emerald-500/50">
-                                  ✓ Aprovado
-                                </span>
-                              ) : (
-                                <span className="px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider rounded border bg-slate-800 text-slate-400 border-slate-700">
-                                  Pendente
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
         </div>
 
         <div className="space-y-6">
@@ -471,7 +442,7 @@ export default function DashboardSponsor() {
 
           <section className="bg-[#1e293b] rounded-2xl p-6 border border-slate-700 shadow-xl">
             <h2 className="text-lg font-semibold text-slate-300 mb-2">Progresso Físico Global</h2>
-            <p className="text-xs text-slate-400 mb-4">Evolução consolidada dos marcos.</p>
+            <p className="text-xs text-slate-400 mb-4">Evolução consolidada de todas as fases.</p>
             
             <div className="flex justify-between text-sm mb-2">
               <span className="text-slate-400">Execução Geral</span>
@@ -481,7 +452,7 @@ export default function DashboardSponsor() {
               <div className="bg-emerald-500 h-4 rounded-full transition-all" style={{ width: `${Math.min(progressoFisicoTotal, 100)}%` }}></div>
             </div>
             <div className="text-[11px] text-slate-400 text-center">
-              {milestones.length} marco(s) catalogados.
+              {milestones.length} fase(s) catalogada(s).
             </div>
           </section>
 
@@ -489,15 +460,15 @@ export default function DashboardSponsor() {
             <h2 className="text-lg font-bold text-[#fbbf24] mb-2">Ação Requerida</h2>
             {artefatosPendentes.length > 0 ? (
               <>
-                <p className="text-sm text-amber-200/80 mb-4">A Fase {faseAtual} possui <strong>{artefatosPendentes.length} artefato(s)</strong> aguardando sua análise/assinatura.</p>
+                <p className="text-sm text-amber-200/80 mb-4">A Fase atual ({faseAtual}) possui <strong>{artefatosPendentes.length} artefato(s)</strong> aguardando sua análise/assinatura para liberar o faturamento do Marco.</p>
                 <button 
                   onClick={() => router.push(`/assinaturas?projectId=${projetoAtual.id}`)}
-                  className="w-full bg-[#fbbf24] hover:bg-[#f59e0b] text-[#0f172a] font-bold py-3 rounded-lg transition"
+                  className="w-full bg-[#fbbf24] hover:bg-[#f59e0b] text-[#0f172a] font-bold py-3 rounded-lg transition shadow-lg"
                 >Abrir Central de Assinaturas</button>
               </>
             ) : (
               <>
-                <p className="text-sm text-emerald-400/80 mb-4 font-semibold">✓ Todos os artefatos da Fase {faseAtual} estão aprovados.</p>
+                <p className="text-sm text-emerald-400/80 mb-4 font-semibold">✓ Todos os portões da fase atual estão aprovados.</p>
                 <button disabled className="w-full bg-slate-800 text-slate-500 font-bold py-3 rounded-lg cursor-not-allowed">Nenhuma Pendência</button>
               </>
             )}
@@ -509,7 +480,7 @@ export default function DashboardSponsor() {
         <div className="fixed inset-0 bg-[#0f172a]/90 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-[#1e293b] p-8 rounded-2xl border border-slate-600 max-w-lg w-full">
             <div className="flex justify-between items-start mb-4 border-b border-slate-700 pb-4">
-              <div><span className="text-xs text-emerald-400 font-bold uppercase">Fase {modalGate.phase_number} — Aprovado</span><h3 className="text-xl font-bold mt-1">{modalGate.document_title}</h3></div>
+              <div><span className="text-xs text-emerald-400 font-bold uppercase">Tollgate Aprovado</span><h3 className="text-xl font-bold mt-1">{modalGate.document_title}</h3></div>
               <button onClick={() => setModalGate(null)} className="text-slate-400 hover:text-white font-bold">✕</button>
             </div>
             <p className="text-sm text-slate-300 mb-6">{modalGate.description}</p>

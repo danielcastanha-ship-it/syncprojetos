@@ -10,7 +10,8 @@ interface Project {
   original_baseline: number; objective?: string; in_scope?: string; out_scope?: string;
   clients?: { name: string; contact_name: string; contact_email: string };
 }
-interface Milestone { id: string; title: string; due_date?: string; status: string; progress: number; }
+interface Milestone { id: string; title: string; due_date?: string; status: string; progress: number; order_index: number; }
+interface PhaseGate { id: string; phase_number: number; document_title: string; description: string; status: string; }
 interface Risk { id: string; title: string; probability: string; impact: string; mitigation_plan?: string; status: string; }
 interface ChangeRequest { id: string; cr_number: string; title: string; financial_impact: number; status: string; }
 
@@ -22,6 +23,7 @@ function RelatorioExecutivoContent() {
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [gates, setGates] = useState<PhaseGate[]>([]);
   const [risks, setRisks] = useState<Risk[]>([]);
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
 
@@ -29,18 +31,26 @@ function RelatorioExecutivoContent() {
     if (!projectId) { router.push('/sync-hq'); return; }
 
     async function fetchReportData() {
+      // 1. Projeto e Cliente
       const { data: projData } = await supabase.from('projects')
         .select('*, clients(name, contact_name, contact_email)')
         .eq('id', projectId)
         .single();
       if (projData) setProject(projData);
 
+      // 2. Marcos (Cronograma)
       const { data: msData } = await supabase.from('project_milestones').select('*').eq('project_id', projectId).order('order_index');
       if (msData) setMilestones(msData);
 
+      // 3. Portões de Governança (Artefatos)
+      const { data: gateData } = await supabase.from('phase_gates').select('*').eq('project_id', projectId).order('phase_number');
+      if (gateData) setGates(gateData);
+
+      // 4. Riscos
       const { data: riskData } = await supabase.from('project_risks').select('*').eq('project_id', projectId).order('order_index');
       if (riskData) setRisks(riskData);
 
+      // 5. Change Requests
       const { data: crData } = await supabase.from('change_requests').select('*').eq('project_id', projectId).order('created_at');
       if (crData) setChangeRequests(crData);
 
@@ -75,6 +85,7 @@ function RelatorioExecutivoContent() {
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8 print:p-0 print:bg-white print:text-black">
+      {/* BARRA DE AÇÃO */}
       <div className="max-w-4xl mx-auto mb-6 flex justify-between items-center print:hidden">
         <button onClick={() => router.push('/sync-hq')} className="text-sm font-bold text-slate-400 hover:text-white transition">
           ← Voltar ao Sync HQ
@@ -87,8 +98,10 @@ function RelatorioExecutivoContent() {
         </button>
       </div>
 
+      {/* DOCUMENTO EXECUTIVO */}
       <div className="max-w-4xl mx-auto bg-[#1e293b] print:bg-white border border-slate-700 print:border-none rounded-2xl print:rounded-none p-10 shadow-2xl space-y-8">
         
+        {/* CABEÇALHO */}
         <div className="border-b border-slate-700 print:border-slate-300 pb-6 flex justify-between items-start">
           <div>
             <div className="text-xs font-bold uppercase tracking-widest text-[#fbbf24] print:text-slate-600 mb-1">Sync Projetos | Relatório Executivo de Status (Status Report)</div>
@@ -103,9 +116,10 @@ function RelatorioExecutivoContent() {
           </div>
         </div>
 
+        {/* MÉTRICAS CHAVE */}
         <div className="grid grid-cols-3 gap-6">
           <div className="bg-[#0f172a] print:bg-slate-100 p-5 rounded-xl border border-slate-700 print:border-slate-300">
-            <span className="block text-[10px] text-slate-400 print:text-slate-600 uppercase font-bold mb-1">Fase Executada</span>
+            <span className="block text-[10px] text-slate-400 print:text-slate-600 uppercase font-bold mb-1">Fase Executiva Atual</span>
             <span className="text-xl font-extrabold text-white print:text-slate-900">{project.status}</span>
           </div>
           <div className="bg-[#0f172a] print:bg-slate-100 p-5 rounded-xl border border-slate-700 print:border-slate-300">
@@ -119,6 +133,7 @@ function RelatorioExecutivoContent() {
           </div>
         </div>
 
+        {/* ESCOPO */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[#fbbf24] print:text-slate-800 border-b border-slate-700 print:border-slate-200 pb-1">1. Alinhamento de Escopo & Baseline</h2>
           {project.objective && <p className="text-sm text-slate-300 print:text-slate-700 leading-relaxed"><strong>Objetivo:</strong> {project.objective}</p>}
@@ -134,28 +149,52 @@ function RelatorioExecutivoContent() {
           </div>
         </div>
 
+        {/* ROADMAP EXECUTIVO & PORTÕES DE GOVERNANÇA (UNIFICADO NO STATUS REPORT) */}
         <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-[#fbbf24] print:text-slate-800 border-b border-slate-700 print:border-slate-200 pb-1">2. Cronograma Macro de Entregas (Milestones)</h2>
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[#fbbf24] print:text-slate-800 border-b border-slate-700 print:border-slate-200 pb-1">2. Roadmap Executivo & Portões de Governança (Milestones & Tollgates)</h2>
           {milestones.length === 0 ? (
             <p className="text-xs text-slate-400 italic">Nenhum marco cadastrado.</p>
           ) : (
-            <div className="space-y-2">
-              {milestones.map(m => (
-                <div key={m.id} className="bg-[#0f172a] print:bg-slate-50 p-3 rounded-xl border border-slate-700 print:border-slate-200 flex justify-between items-center text-xs">
-                  <div>
-                    <strong className="text-white print:text-slate-900">{m.title}</strong>
-                    {m.due_date && <span className="text-slate-400 print:text-slate-600 ml-2 font-mono">(Previsão: {m.due_date})</span>}
+            <div className="space-y-3">
+              {milestones.map((m, index) => {
+                const phaseNum = index + 1;
+                const faseArtefatos = gates.filter(g => g.phase_number === phaseNum);
+
+                return (
+                  <div key={m.id} className="bg-[#0f172a] print:bg-slate-50 p-4 rounded-xl border border-slate-700 print:border-slate-300 space-y-3">
+                    <div className="flex justify-between items-center text-xs">
+                      <div>
+                        <strong className="text-white print:text-slate-900 text-sm">Fase {phaseNum}: {m.title}</strong>
+                        {m.due_date && <span className="text-slate-400 print:text-slate-600 ml-2 font-mono">(Alvo: {m.due_date})</span>}
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="font-mono font-bold text-emerald-400 print:text-slate-800">{m.progress}%</span>
+                        <span className="px-2 py-0.5 rounded font-bold uppercase text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print:text-slate-800">{m.status}</span>
+                      </div>
+                    </div>
+
+                    {/* Portões de Governança embutidos no relatório */}
+                    {faseArtefatos.length > 0 && (
+                      <div className="border-t border-slate-800 print:border-slate-200 pt-2 pl-3 space-y-1">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 print:text-slate-600 tracking-wider block">Portões Obrigatórios:</span>
+                        {faseArtefatos.map(gate => (
+                          <div key={gate.id} className="flex justify-between items-center text-[11px] text-slate-300 print:text-slate-700">
+                            <span>• {gate.document_title}</span>
+                            <span className={`font-bold uppercase text-[9px] px-1.5 py-0.2 rounded ${gate.status === 'Aprovado' ? 'text-emerald-400 print:text-emerald-800' : gate.status === 'Rejeitado' ? 'text-red-400 print:text-red-800' : 'text-amber-400 print:text-amber-800'}`}>
+                              {gate.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-mono font-bold text-emerald-400 print:text-slate-800">{m.progress}%</span>
-                    <span className="px-2 py-0.5 rounded font-bold uppercase text-[10px] bg-slate-800 print:bg-slate-200 text-slate-300 print:text-slate-800">{m.status}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
 
+        {/* MATRIZ DE RISCOS */}
         <div className="space-y-3">
           <h2 className="text-sm font-bold uppercase tracking-wider text-[#fbbf24] print:text-slate-800 border-b border-slate-700 print:border-slate-200 pb-1">3. Principais Riscos & Impedimentos</h2>
           {risks.length === 0 ? (
@@ -175,6 +214,7 @@ function RelatorioExecutivoContent() {
           )}
         </div>
 
+        {/* ADITIVOS (CRs) */}
         {changeRequests.length > 0 && (
           <div className="space-y-3">
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#fbbf24] print:text-slate-800 border-b border-slate-700 print:border-slate-200 pb-1">4. Aditivos de Escopo (Change Requests)</h2>
@@ -194,6 +234,7 @@ function RelatorioExecutivoContent() {
           </div>
         )}
 
+        {/* RODAPÉ */}
         <div className="border-t border-slate-700 print:border-slate-300 pt-6 text-center text-xs text-slate-500 print:text-slate-500">
           Sync Projetos — Sistema de Governança Corporativa e PMO de Alta Performance.
         </div>
