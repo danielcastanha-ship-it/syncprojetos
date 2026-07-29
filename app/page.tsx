@@ -26,8 +26,18 @@ export default function LoginScreen() {
       console.error("ERRO REAL DO SUPABASE:", error.message);
       setError(`Erro técnico: ${error.message}`);
     } else if (data.user) {
-      // Sucesso! Redirecionar para o Dashboard Executivo
-      router.push('/dashboard');
+      
+      // Inteligência de Roteamento (Smart Redirect)
+      const params = new URLSearchParams(window.location.search);
+      const redirectRoute = params.get('redirect');
+
+      if (redirectRoute) {
+        // O usuário veio do e-mail de compra do Asaas
+        router.push(redirectRoute);
+      } else {
+        // Login orgânico, vai para o painel principal
+        router.push('/dashboard');
+      }
     }
     setLoading(false);
   };
