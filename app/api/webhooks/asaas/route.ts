@@ -26,10 +26,9 @@ export async function POST(request: Request) {
       throw new Error('ID do cliente não encontrado no payload do webhook.');
     }
 
-    // ATENÇÃO: Usando a URL do Sandbox do Asaas para os testes atuais
-    const asaasApiUrl = process.env.NODE_ENV === 'development' 
-      ? 'https://sandbox.asaas.com/api/v3' 
-      : 'https://api.asaas.com/v3';
+    // ATENÇÃO: Forçando URL do Sandbox para homologação no Netlify. 
+    // Lembre-se de mudar para 'https://api.asaas.com/v3' quando for lançar o sistema oficialmente.
+    const asaasApiUrl = 'https://sandbox.asaas.com/api/v3';
 
     const asaasCustomerResponse = await fetch(`${asaasApiUrl}/customers/${asaasCustomerId}`, {
       method: 'GET',
