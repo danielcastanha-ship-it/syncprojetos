@@ -78,7 +78,7 @@ export async function POST(request: Request) {
           <p>O seu pagamento foi aprovado com sucesso via Asaas e sua infraestrutura executiva já está provisionada.</p>
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <p style="margin: 0 0 10px 0;"><strong>Acesse seu painel através do link:</strong></p>
-            <p style="margin: 0 0 10px 0;"><a href="https://https://syncprojetossaas.netlify.app/?redirect=/cofre" style="color: #2563eb; font-weight: bold;">https://app.syncprojetos.com</a></p>
+            <p style="margin: 0 0 10px 0;"><a href="https://syncprojetossaas.netlify.app/?redirect=/cofre" style="color: #2563eb; font-weight: bold;">https://syncprojetos.com</a></p>
             <p style="margin: 0 0 5px 0;"><strong>Usuário:</strong> ${customerEmail}</p>
             <p style="margin: 0 0 0 0;"><strong>Senha Provisória:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${tempPassword}</span></p>
           </div>
