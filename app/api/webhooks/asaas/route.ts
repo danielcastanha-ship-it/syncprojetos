@@ -73,7 +73,7 @@ export async function POST(request: Request) {
 
     // 6. Disparo do E-mail Transacional
     const { error: emailError } = await resend.emails.send({
-      from: 'Cofre da Sync Projetos <onboarding@syncprojetos.com.br>',
+      from: 'Cofre da Sync Projetos <contato@syncprojetos.com>',
       to: customerEmail,
       subject: '🚀 Pagamento Confirmado! Seu acesso ao Cofre da Governança',
       html: `
