@@ -144,10 +144,10 @@ export default function CofrePage() {
         {/* Botão de Saída */}
         <div className="pt-8 flex justify-end">
           <button 
-            onClick={() => router.push('/login')} 
+            onClick={() => router.push('/')} 
             className="text-sm font-bold text-slate-500 hover:text-red-400 transition"
           >
-            Sair do Cofre
+            Voltar para a Página Inicial
           </button>
         </div>
 
