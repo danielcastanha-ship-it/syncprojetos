@@ -11,22 +11,22 @@ export default function CofrePage() {
     { 
       titulo: "Matriz OKR & SMART", 
       desc: "Planilha automatizada para rastreamento de objetivos estratégicos e KPIs.", 
-      link: "https://docs.google.com/spreadsheets/d/1jUmxKMx3pB22IJS3iikNQC0Z46Xly8Bzt9zbfl1zVhU/edit?usp=drive_web" 
+      link: "https://docs.google.com/spreadsheets/d/14FQMK5GNv2OX1AD1QQ4zkOvGtwg8yp3SZw5SvaN22UA/edit?usp=sharing"
     },
     { 
       titulo: "Gestão de Stakeholders", 
       desc: "Radar tático para mapeamento de poder, interesse e engajamento.", 
-      link: "#" // Insira o link do seu Google Sheets aqui
+      link: "https://docs.google.com/spreadsheets/d/12iy_3Hde_Aro6PkiF4ljiD1oS-h3PT3U__IKqotmCQU/edit?usp=sharing" // Insira o link do seu Google Sheets aqui
     },
     { 
       titulo: "Inventário SIPOC (Processos)", 
       desc: "Matriz executiva de fornecedores, insumos, processos e entregáveis.", 
-      link: "#" // Insira o link do seu Google Sheets aqui
+      link: "https://docs.google.com/spreadsheets/d/1xKB66m09Ky97-M_PJ4RPsQb5GQvIs6mEfq5a7zpTu2U/edit?usp=sharing" // Insira o link do seu Google Sheets aqui
     },
     { 
       titulo: "Matriz de Riscos (Heatmap)", 
       desc: "Gerenciamento visual 5x5 de Probabilidade vs. Impacto.", 
-      link: "#" // Insira o link do seu Google Sheets aqui
+      link: "https://docs.google.com/spreadsheets/d/1wxPq-TKidJOFpYW4FKfAlL8LOP_B1Wv_iGfvP46TEGQ/edit?usp=sharing" // Insira o link do seu Google Sheets aqui
     }
   ];
 
