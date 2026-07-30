@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     // ATENÇÃO: Forçando URL do Sandbox para homologação no Netlify. 
     // Lembre-se de mudar para 'https://api.asaas.com/v3' quando for lançar o sistema oficialmente.
-    const asaasApiUrl = 'https://sandbox.asaas.com/api/v3';
+    const asaasApiUrl = 'https://api.asaas.com/api/v3';
 
     const asaasCustomerResponse = await fetch(`${asaasApiUrl}/customers/${asaasCustomerId}`, {
       method: 'GET',
