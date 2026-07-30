@@ -155,4 +155,3 @@ export default function CofrePage() {
     </main>
   );
 }
-}
