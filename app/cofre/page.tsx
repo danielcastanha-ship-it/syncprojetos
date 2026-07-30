@@ -147,7 +147,7 @@ export default function CofrePage() {
             onClick={() => router.push('/')} 
             className="text-sm font-bold text-slate-500 hover:text-red-400 transition"
           >
-            Voltar para a Página Inicial
+            Sair do Cofre
           </button>
         </div>
 
