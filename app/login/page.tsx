@@ -91,7 +91,7 @@ export default function LoginPage() {
 
         <div className="mt-8 text-center text-sm text-slate-500 border-t border-slate-800 pt-6">
           Esqueceu sua senha ou precisa de ajuda? <br/>
-          <a href="#" className="text-[#fbbf24] hover:underline">Fale com o Suporte</a>
+          <a href="mailto:contato@syncprojetos.com?subject=Preciso%20de%20Ajuda!" className="text-[#fbbf24] hover:underline">Fale com o Suporte</a>
         </div>
       </div>
       
