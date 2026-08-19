@@ -175,11 +175,14 @@ export default function CofrePage() {
 
         {/* OFFBOARDING (CANCELAMENTO) */}
         <section className="mt-16 border-t border-slate-800 pt-8 flex justify-center">
-          <p className="text-xs text-slate-600">
-            Deseja gerenciar sua assinatura ou interromper a renovação mensal?{' '}
-            <a href="mailto:contato@syncprojetos.com?subject=Solicitação%20de%20Cancelamento" className="text-slate-500 hover:text-slate-300 underline transition">
-              Solicitar cancelamento via Suporte
-            </a>
+          <p className="text-xs text-slate-500 text-center max-w-lg leading-relaxed">
+            Transparência total: você tem controle absoluto sobre a sua assinatura. Para interromper a renovação mensal, utilize o link de gerenciamento enviado nos seus e-mails de fatura ou{' '}
+            <a 
+              href="mailto:contato@syncprojetos.com?subject=Solicitação%20de%20Cancelamento%20do%20Cofre" 
+              className="text-slate-400 hover:text-[#fbbf24] underline transition"
+            >
+              solicite o cancelamento ao nosso suporte
+            </a>.
           </p>
         </section>
 
