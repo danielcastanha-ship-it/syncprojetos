@@ -75,20 +75,21 @@ export async function POST(request: Request) {
     const { error: emailError } = await resend.emails.send({
       from: 'Cofre da Sync Projetos <contato@syncprojetos.com>',
       to: customerEmail,
-      subject: '🚀 Pagamento Confirmado! Seu acesso ao Cofre da Governança',
+      subject: '🚀 [Sync Projetos] Seu acesso ao Cofre + Mentoria já foi liberado!]',
       html: `
         <div style="font-family: sans-serif; color: #0f172a; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 10px;">
-          <h2 style="color: #fbbf24;">Bem-vindo ao Cofre da Sync, ${customerName}!</h2>
-          <p>O seu pagamento foi aprovado com sucesso via Asaas e sua infraestrutura executiva já está provisionada.</p>
+          <h2 style="color: #fbbf24;">Olá, ${customerName}!</h2>
+          <p>O seu pagamento foi confirmado e o seu acesso ao <b>Cofre da Sync + Mentoria</b> está oficialmente liberado. A partir de agora, você não precisa mais começar matrizes complexas do zero.</p>
           <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <p style="margin: 0 0 10px 0;"><strong>Acesse seu painel através do link:</strong></p>
-            <p style="margin: 0 0 10px 0;"><a href="https://syncprojetossaas.netlify.app/?redirect=/cofre" style="color: #2563eb; font-weight: bold;">https://syncprojetos.com</a></p>
+            <p style="margin: 0 0 10px 0;"><strong>Aqui estão suas credenciais de acesso único:</strong></p>
+            <p style="margin: 0 0 10px 0;"><strong> Página de Login:</strong> <a href="https://syncprojetossaas.netlify.app/?redirect=/login" style="color: #2563eb; font-weight: bold;">https://syncprojetos.com</a></p>
             <p style="margin: 0 0 5px 0;"><strong>Usuário:</strong> ${customerEmail}</p>
             <p style="margin: 0 0 0 0;"><strong>Senha Provisória:</strong> <span style="font-family: monospace; background: #e2e8f0; padding: 2px 6px; border-radius: 4px;">${tempPassword}</span></p>
           </div>
-          <p style="font-size: 12px; color: #64748b;"><em>Por diretrizes de Compliance, o sistema exigirá que você redefina esta senha no seu primeiro acesso.</em></p>
+          <p style="font-size: 12px; color: #64748b;"><em>Recomendamos que você acesse a plataforma e baixe os artefatos iniciais antes da nossa primeira mentoria quinzenal.</em></p>
+          <p style="font-size: 12px; color: #64748b;"><em>Nos vemos nas trincheiras,.</em></p>
           <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-          <p style="font-size: 14px; font-weight: bold;">Diretoria Estratégica | Sync Projetos</p>
+          <p style="font-size: 14px; font-weight: bold;">Equipe Sync Projetos</p>
         </div>
       `
     });
